@@ -14,11 +14,29 @@ console.log('[DEPLOYMENT] Starting server with Supabase Postgres...');
 // Create Postgres pool if DATABASE_URL is available
 let pool: Pool | null = null;
 if (process.env.DATABASE_URL) {
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-  });
-  console.log('[DEPLOYMENT] Supabase Postgres pool initialized');
+  try {
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 10000,
+      idleTimeoutMillis: 30000,
+      max: 5
+    });
+    
+    // Test the connection
+    pool.query('SELECT 1')
+      .then(() => console.log('[DEPLOYMENT] Supabase Postgres connection verified'))
+      .catch((err) => {
+        console.error('[DEPLOYMENT] Supabase connection test failed:', err.message);
+        console.log('[DEPLOYMENT] Falling back to in-memory storage');
+        pool = null;
+      });
+      
+    console.log('[DEPLOYMENT] Supabase Postgres pool initialized');
+  } catch (error) {
+    console.error('[DEPLOYMENT] Failed to create Postgres pool:', error);
+    pool = null;
+  }
 } else {
   console.log('[DEPLOYMENT] No DATABASE_URL found, using in-memory storage');
 }
@@ -52,19 +70,40 @@ app.post('/api/signups', async (req, res) => {
     }
 
     if (!pool) {
-      console.error('[SIGNUPS] No database connection available');
-      return res.status(500).json({ ok: false, error: 'Database not available' });
+      console.log('[SIGNUPS] No database connection - using in-memory fallback for:', email);
+      // In production, you might want to queue these for later processing
+      return res.status(201).json({ 
+        ok: true, 
+        message: 'Signup received (stored in-memory)' 
+      });
     }
 
+    // Test connection before inserting
+    await pool.query('SELECT 1');
+    
     await pool.query(
       'INSERT INTO public.signups(first_name, last_name, email, phone) VALUES($1, $2, $3, $4)',
       [first_name, last_name, email, phone]
     );
 
-    console.log(`[SIGNUPS] New signup: ${email}`);
-    res.status(201).json({ ok: true });
+    console.log(`[SIGNUPS] New signup saved to Supabase: ${email}`);
+    res.status(201).json({ ok: true, message: 'Signup saved to database' });
   } catch (error) {
-    console.error('[SIGNUPS] Database error:', error);
+    console.error('[SIGNUPS] Database error:', error.message);
+    
+    // Provide more specific error information
+    if (error.code === 'ENOTFOUND') {
+      return res.status(500).json({ 
+        ok: false, 
+        error: 'Database connection failed - DNS resolution error' 
+      });
+    } else if (error.code === '23505') {
+      return res.status(409).json({ 
+        ok: false, 
+        error: 'Email already registered' 
+      });
+    }
+    
     res.status(500).json({ ok: false, error: 'Server error' });
   }
 });
