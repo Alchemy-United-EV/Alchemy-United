@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { Router, Route, Switch } from "wouter";
 import Home from "@/pages/home/Home";
+import EarlyAccess from "@/pages/early-access";
 import "./index.css";
 import './integrations/forms';
 
@@ -344,7 +345,7 @@ function HomeComponent() {
       <Router>
         <Switch>
           <Route path="/" component={Home} />
-          <Route path="/early-access" component={EarlyAccessForm} />
+          <Route path="/early-access" component={EarlyAccess} />
           <Route path="/host-application" component={HostApplicationForm} />
           <Route>
             <div>Page not found</div>
