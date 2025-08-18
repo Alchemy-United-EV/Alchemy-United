@@ -2,86 +2,40 @@ import { useState } from 'react';
 import { supabase } from '../supabaseClient';
 
 export default function HostApplication() {
-  const [formData, setFormData] = useState({
-    business_name: '',
-    property_type: '',
-    first_name: '',
-    last_name: '',
-    email: '',
-    phone: '',
-    property_address: '',
-    parking_spaces: '',
-    electrical_capacity: '',
-    daily_traffic: '',
-    operating_hours: '',
-    partnership_model: '',
-    implementation_timeline: '',
-    amenities: '',
-    additional_info: ''
-  });
-
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error'>('success');
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const resetForm = () => {
-    setFormData({
-      business_name: '',
-      property_type: '',
-      first_name: '',
-      last_name: '',
-      email: '',
-      phone: '',
-      property_address: '',
-      parking_spaces: '',
-      electrical_capacity: '',
-      daily_traffic: '',
-      operating_hours: '',
-      partnership_model: '',
-      implementation_timeline: '',
-      amenities: '',
-      additional_info: ''
-    });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
     setMessage('');
 
     try {
-      // Use backend API instead of direct Supabase client
-      const response = await fetch('/api/host-applications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
+      const form = new FormData(e.currentTarget);
+      const payload = Object.fromEntries(form.entries()); // keys must match column names
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to submit application');
+      // Try Supabase first, fallback to API route if needed
+      if (supabase) {
+        const { error } = await supabase.from("host_applications").insert([payload]);
+        if (error) throw error;
+      } else {
+        // Fallback to API route if Supabase client not configured
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/host-applications`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        await res.json();
       }
 
       setMessage('Host application submitted successfully! We will contact you soon.');
       setMessageType('success');
-      resetForm();
-      
-      // Redirect to thank you page after a short delay
-      setTimeout(() => {
-        window.location.href = '/thank-you';
-      }, 1500);
+      e.currentTarget.reset();
     } catch (error: any) {
-      console.error('Error submitting host application:', error);
-      setMessage(`Error submitting application: ${error.message}`);
+      console.error('[host_applications submit]', error);
+      setMessage(`Submission failed: ${error?.message || 'Unknown error'}`);
       setMessageType('error');
     } finally {
       setIsSubmitting(false);
@@ -122,8 +76,6 @@ export default function HostApplication() {
                   <input
                     type="text"
                     name="business_name"
-                    value={formData.business_name}
-                    onChange={handleInputChange}
                     required
                     className="w-full border border-gray-600 bg-black/30 text-white p-2 rounded focus:border-yellow-500 focus:outline-none"
                     placeholder="Your business name"
@@ -136,8 +88,6 @@ export default function HostApplication() {
                   </label>
                   <select
                     name="property_type"
-                    value={formData.property_type}
-                    onChange={handleInputChange}
                     required
                     className="w-full border border-gray-600 bg-black/30 text-white p-2 rounded focus:border-yellow-500 focus:outline-none"
                   >
@@ -159,8 +109,6 @@ export default function HostApplication() {
                   <input
                     type="text"
                     name="first_name"
-                    value={formData.first_name}
-                    onChange={handleInputChange}
                     required
                     className="w-full border border-gray-600 bg-black/30 text-white p-2 rounded focus:border-yellow-500 focus:outline-none"
                     placeholder="First name"
@@ -174,8 +122,6 @@ export default function HostApplication() {
                   <input
                     type="text"
                     name="last_name"
-                    value={formData.last_name}
-                    onChange={handleInputChange}
                     required
                     className="w-full border border-gray-600 bg-black/30 text-white p-2 rounded focus:border-yellow-500 focus:outline-none"
                     placeholder="Last name"
@@ -191,8 +137,6 @@ export default function HostApplication() {
                   <input
                     type="email"
                     name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
                     required
                     className="w-full border border-gray-600 bg-black/30 text-white p-2 rounded focus:border-yellow-500 focus:outline-none"
                     placeholder="your@email.com"
@@ -206,8 +150,6 @@ export default function HostApplication() {
                   <input
                     type="tel"
                     name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
                     required
                     className="w-full border border-gray-600 bg-black/30 text-white p-2 rounded focus:border-yellow-500 focus:outline-none"
                     placeholder="(555) 123-4567"
@@ -223,8 +165,6 @@ export default function HostApplication() {
                 <input
                   type="text"
                   name="property_address"
-                  value={formData.property_address}
-                  onChange={handleInputChange}
                   required
                   className="w-full border border-gray-600 bg-black/30 text-white p-2 rounded focus:border-yellow-500 focus:outline-none"
                   placeholder="Full property address"
@@ -239,8 +179,6 @@ export default function HostApplication() {
                   <input
                     type="number"
                     name="parking_spaces"
-                    value={formData.parking_spaces}
-                    onChange={handleInputChange}
                     required
                     min="1"
                     className="w-full border border-gray-600 bg-black/30 text-white p-2 rounded focus:border-yellow-500 focus:outline-none"
@@ -255,8 +193,6 @@ export default function HostApplication() {
                   <input
                     type="text"
                     name="electrical_capacity"
-                    value={formData.electrical_capacity}
-                    onChange={handleInputChange}
                     className="w-full border border-gray-600 bg-black/30 text-white p-2 rounded focus:border-yellow-500 focus:outline-none"
                     placeholder="e.g., 400A, 800A"
                   />
@@ -271,8 +207,6 @@ export default function HostApplication() {
                   <input
                     type="text"
                     name="daily_traffic"
-                    value={formData.daily_traffic}
-                    onChange={handleInputChange}
                     className="w-full border border-gray-600 bg-black/30 text-white p-2 rounded focus:border-yellow-500 focus:outline-none"
                     placeholder="Average daily visitors"
                   />
@@ -285,8 +219,6 @@ export default function HostApplication() {
                   <input
                     type="text"
                     name="operating_hours"
-                    value={formData.operating_hours}
-                    onChange={handleInputChange}
                     className="w-full border border-gray-600 bg-black/30 text-white p-2 rounded focus:border-yellow-500 focus:outline-none"
                     placeholder="e.g., 6 AM - 10 PM"
                   />
@@ -301,8 +233,6 @@ export default function HostApplication() {
                   <input
                     type="text"
                     name="partnership_model"
-                    value={formData.partnership_model}
-                    onChange={handleInputChange}
                     className="w-full border border-gray-600 bg-black/30 text-white p-2 rounded focus:border-yellow-500 focus:outline-none"
                     placeholder="Revenue share, lease, etc."
                   />
@@ -315,8 +245,6 @@ export default function HostApplication() {
                   <input
                     type="text"
                     name="implementation_timeline"
-                    value={formData.implementation_timeline}
-                    onChange={handleInputChange}
                     className="w-full border border-gray-600 bg-black/30 text-white p-2 rounded focus:border-yellow-500 focus:outline-none"
                     placeholder="Preferred start date"
                   />
@@ -329,8 +257,6 @@ export default function HostApplication() {
                 </label>
                 <textarea
                   name="amenities"
-                  value={formData.amenities}
-                  onChange={handleInputChange}
                   rows={3}
                   className="w-full border border-gray-600 bg-black/30 text-white p-2 rounded focus:border-yellow-500 focus:outline-none"
                   placeholder="Describe amenities available (restaurant, shopping, WiFi, etc.)"
@@ -343,8 +269,6 @@ export default function HostApplication() {
                 </label>
                 <textarea
                   name="additional_info"
-                  value={formData.additional_info}
-                  onChange={handleInputChange}
                   rows={4}
                   className="w-full border border-gray-600 bg-black/30 text-white p-2 rounded focus:border-yellow-500 focus:outline-none"
                   placeholder="Any additional details you'd like to share about your property or partnership goals"
