@@ -1,0 +1,67 @@
+You are my code assistant. Update my Node/Express + Vite project to save the Early Access form into Supabase Postgres.
+
+Context:
+- Backend entry file is server/index.ts (TypeScript).
+- I’m using Vite on the frontend.
+- Supabase table exists: public.signups(first_name text, last_name text, email text NOT NULL, phone text, id uuid default gen_random_uuid() primary key, created_at timestamptz default now()).
+
+Tasks:
+
+1) Install backend deps:
+   run: npm i pg cors dotenv
+
+2) Ensure package.json scripts stay as they are if present:
+   "dev": "NODE_ENV=development tsx server/index.ts",
+   "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+   "start": "NODE_ENV=production node dist/index.js"
+
+3) Create/update .gitignore to include:
+   node_modules
+   .env
+   dist
+   .vercel
+
+4) Create .env.example with:
+   DATABASE_URL=postgres://USER:PASSWORD@HOST:PORT/DB?sslmode=require
+
+5) Edit server/index.ts:
+   - import express, cors, dotenv, and Pool from pg
+   - dotenv.config()
+   - const app = express()
+   - app.use(express.json())
+   - app.use(cors({ origin: true, credentials: true }))
+
+   - Create a Postgres pool:
+     const pool = new Pool({
+       connectionString: process.env.DATABASE_URL,
+       ssl: { rejectUnauthorized: false },
+     });
+
+   - Add a health route:
+     app.get("/api/health", (_req, res) => {
+       res.status(200).json({ ok: true, env: process.env.NODE_ENV || "development" });
+     });
+
+   - Add POST /api/signups route that:
+     * reads { first_name, last_name, email, phone } from req.body
+     * if no email -> return 400 with { ok:false, error:"Email is required" }
+     * inserts into public.signups(first_name, last_name, email, phone) values($1,$2,$3,$4)
+     * returns { ok:true } on success
+     * catches errors, logs them, and returns 500 { ok:false, error:"Server error" }
+
+   - Keep existing server listen code. If missing, add:
+     const port = process.env.PORT || 3000;
+     app.listen(port, () => console.log(`API running on :${port}`));
+     export default app;
+
+6) Do NOT expose DATABASE_URL to the frontend.
+
+7) After changes, show me the final diffs for:
+   - server/index.ts
+   - package.json (scripts only)
+   - .gitignore
+   - .env.example
+
+Also print a ready-to-run curl test command that hits /api/health and /api/signups against my Replit URL placeholder like:
+curl https://<REPL-URL>/api/health
+curl -X POST https://<REPL-URL>/api/signups -H "Content-Type: application/json" -d '{"first_name":"Jay","last_name":"B","email":"jay@example.com","phone":"832-555-0000"}'

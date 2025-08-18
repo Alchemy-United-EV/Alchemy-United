@@ -29,10 +29,18 @@ export default function EarlyAccess() {
         location: "Not specified"
       };
       
-      const response = await fetch('/api/early-access-applications', {
+      // Submit to Supabase via new signups endpoint  
+      const supabaseData = {
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        email: formData.email,
+        phone: formData.phone
+      };
+
+      const response = await fetch('/api/signups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(submissionData),
+        body: JSON.stringify(supabaseData),
       });
       
       if (response.ok) {

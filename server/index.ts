@@ -1,27 +1,73 @@
-// Pure in-memory storage - no database dependencies
-
-console.log('[DEPLOYMENT] Starting with in-memory storage...');
+// Supabase Postgres integration with fallback to in-memory storage
 
 import express, { type Request, type Response, type NextFunction } from "express";
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { Pool } from 'pg';
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
-console.log('[DEPLOYMENT] In-memory storage initialized');
+dotenv.config();
+
+console.log('[DEPLOYMENT] Starting server with Supabase Postgres...');
+
+// Create Postgres pool if DATABASE_URL is available
+let pool: Pool | null = null;
+if (process.env.DATABASE_URL) {
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  });
+  console.log('[DEPLOYMENT] Supabase Postgres pool initialized');
+} else {
+  console.log('[DEPLOYMENT] No DATABASE_URL found, using in-memory storage');
+}
 
 const app = express();
 app.set('trust proxy', 1);  // For correct req.ip in autoscale
 
-// A) Health endpoint FIRST so Vite dev middleware can't intercept it
-app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    env: process.env.NODE_ENV || 'development'
-  });
-});
+// CORS configuration
+app.use(cors({ origin: true, credentials: true }));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// A) Health endpoint FIRST so Vite dev middleware can't intercept it
+app.get('/api/health', (_req, res) => {
+  res.status(200).json({ 
+    ok: true, 
+    env: process.env.NODE_ENV || 'development',
+    database: !!pool ? 'postgres' : 'in-memory',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// B) Supabase signups endpoint
+app.post('/api/signups', async (req, res) => {
+  try {
+    const { first_name, last_name, email, phone } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ ok: false, error: 'Email is required' });
+    }
+
+    if (!pool) {
+      console.error('[SIGNUPS] No database connection available');
+      return res.status(500).json({ ok: false, error: 'Database not available' });
+    }
+
+    await pool.query(
+      'INSERT INTO public.signups(first_name, last_name, email, phone) VALUES($1, $2, $3, $4)',
+      [first_name, last_name, email, phone]
+    );
+
+    console.log(`[SIGNUPS] New signup: ${email}`);
+    res.status(201).json({ ok: true });
+  } catch (error) {
+    console.error('[SIGNUPS] Database error:', error);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
 
 app.use((req, res, next) => {
   const start = Date.now();

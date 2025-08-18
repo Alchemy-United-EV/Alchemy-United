@@ -62,6 +62,9 @@ vite.config.ts.*
 *.bz2
 *.xz
 
+# Deployment and hosting
+.vercel
+
 # Replit specific
 .replit_modules/
 .config/
