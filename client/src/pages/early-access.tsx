@@ -36,8 +36,7 @@ export default function EarlyAccess() {
         />
         <div></div>
       </nav>
-
-      <main className="pt-32 pb-12 px-4 sm:px-6 lg:px-8">
+      <main className="pt-32 pb-12 px-4 sm:px-6 lg:px-8 text-[#f0f1f2]">
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-12">
             <h1 className="text-4xl sm:text-5xl font-black text-white mb-4 font-display">
