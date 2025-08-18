@@ -36,9 +36,9 @@ Preferred communication style: Simple, everyday language.
 - **Development**: Hot reload with Vite middleware integration.
 
 ## Data Layer
-- **Storage**: ReplDB for deployment validation, email-only forms for data collection.
-- **Database Integration**: Satisfies `javascript_database==1.0.0` requirement without SQL dependency.
-- **Forms**: Direct email/webhook integration, no database persistence needed.
+- **Storage**: Pure in-memory storage (MemStorage) for development and form handling.
+- **No Database Dependencies**: Removed Neon PostgreSQL and all database-related packages.
+- **Forms**: In-memory processing with email integration, no persistent storage needed.
 
 ## Development Tools
 - **Package Manager**: npm.

@@ -1,45 +1,11 @@
-// ELECTRIC VEHICLE MODE: Ultimate database suppression system
-process.env.DATABASE_URL = "";
-process.env.PGDATABASE = "";
-process.env.PGUSER = "";
-process.env.PGPASSWORD = "";
-process.env.PGHOST = "";
-process.env.PGPORT = "";
-process.env.NEON_API_KEY = "";
-process.env.DRIZZLE_KIT_CONFIG = "";
-
-// Block all database-related network calls
-const originalFetch = globalThis.fetch;
-if (originalFetch) {
-  globalThis.fetch = function(...args) {
-    const url = args[0];
-    if (typeof url === 'string' && (
-      url.includes('neon') || 
-      url.includes('database') || 
-      url.includes('diff') ||
-      url.includes('drizzle')
-    )) {
-      console.log('[ELECTRIC-MODE] Blocked database API call');
-      return Promise.resolve(new Response('{"status":"disabled"}', { status: 200 }));
-    }
-    return originalFetch.apply(this, args);
-  };
-}
-
-// Handle database endpoint availability issues
-console.log('[DEPLOYMENT] Checking database endpoint status...');
+// Pure in-memory storage - no database dependencies
+console.log('[DEPLOYMENT] Starting with in-memory storage...');
 
 import express, { type Request, type Response, type NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { initializeDatabase } from "./repldb";
 
-// Dual database strategy: ReplDB for validation, PostgreSQL when available
-initializeDatabase().then(() => {
-  console.log('[DEPLOYMENT] ReplDB integration active for deployment validation');
-}).catch((error) => {
-  console.log('[DEPLOYMENT] Database integration established via fallback');
-});
+console.log('[DEPLOYMENT] In-memory storage initialized');
 
 const app = express();
 app.set('trust proxy', 1);  // For correct req.ip in autoscale
