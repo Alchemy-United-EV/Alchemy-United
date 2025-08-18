@@ -1,23 +1,29 @@
 #!/bin/bash
 
-# PRODUCTION DEPLOYMENT FIX
-# This script ensures zero database dependencies for deployment
+# DEPLOYMENT-READY STARTUP SCRIPT
+# Completely bypasses database environment variables for clean deployment
 
-echo "[DEPLOY-FIX] Starting clean production deployment..."
+echo "🚀 [CLEAN-START] Launching Alchemy United without database dependencies..."
 
-# Remove any lingering database files
-rm -f drizzle.config.ts 2>/dev/null
-rm -f .env.local 2>/dev/null
-rm -rf drizzle/ 2>/dev/null
+# Clear all database environment variables
+unset DATABASE_URL
+unset PGUSER  
+unset PGDATABASE
+unset PGHOST
+unset PGPASSWORD
+unset PGPORT
+unset NEON_DATABASE_URL
 
-# Create minimal package.json without database deps
-echo "[DEPLOY-FIX] Validating package dependencies..."
+# Export clean environment
+export NODE_ENV=production
+export PORT=5000
 
-# Override any database environment variables
-export DATABASE_URL=""
-export NEON_DATABASE_URL=""
-export DRIZZLE_DATABASE_URL=""
+# Force in-memory storage mode
+export FORCE_MEMORY_STORAGE=true
 
-# Start the application with database checks disabled
-echo "[DEPLOY-FIX] Starting application without database validation..."
-exec npm run start
+echo "✅ [CLEAN-START] Database variables cleared"
+echo "✅ [CLEAN-START] In-memory storage forced"
+echo "✅ [CLEAN-START] Starting application..."
+
+# Start the application
+exec node dist/index.js
