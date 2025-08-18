@@ -52,7 +52,15 @@ coverage/
 *.tmp
 *.temp
 vite.config.ts.*
+
+# Archive files
+*.zip
 *.tar.gz
+*.tar
+*.7z
+*.rar
+*.bz2
+*.xz
 
 # Replit specific
 .replit_modules/
