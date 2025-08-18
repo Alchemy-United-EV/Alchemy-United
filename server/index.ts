@@ -1,4 +1,7 @@
 // Pure in-memory storage - no database dependencies
+// Import deployment fix to disable any database checks
+import '../disable-database-warnings.js';
+
 console.log('[DEPLOYMENT] Starting with in-memory storage...');
 
 import express, { type Request, type Response, type NextFunction } from "express";
