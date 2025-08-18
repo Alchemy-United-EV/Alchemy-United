@@ -13,10 +13,40 @@ export default function EarlyAccess() {
     phone: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log('Form submitted:', formData);
-    window.location.href = '/thank-you?type=early-access';
+    
+    try {
+      // Submit to server with required fields
+      const submissionData = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        vehicleType: "Model S", // Default values for required fields
+        chargingFrequency: "Weekly",
+        location: "Not specified"
+      };
+      
+      const response = await fetch('/api/early-access-applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(submissionData),
+      });
+      
+      if (response.ok) {
+        // Success - redirect to thank you page
+        window.location.href = '/thank-you?type=early-access';
+      } else {
+        const error = await response.json();
+        console.error('Submission error:', error);
+        alert('There was an error submitting your application. Please try again.');
+      }
+    } catch (error) {
+      console.error('Submission failed:', error);
+      alert('There was an error submitting your application. Please check your internet connection and try again.');
+    }
   };
 
   return (
