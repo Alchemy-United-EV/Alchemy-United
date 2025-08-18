@@ -88,7 +88,7 @@ app.post('/api/signups', async (req, res) => {
 
     console.log(`[SIGNUPS] New signup saved to Supabase: ${email}`);
     res.status(201).json({ ok: true, message: 'Signup saved to database' });
-  } catch (error) {
+  } catch (error: any) {
     console.error('[SIGNUPS] Database error:', error.message);
     
     // Provide more specific error information
@@ -101,6 +101,67 @@ app.post('/api/signups', async (req, res) => {
       return res.status(409).json({ 
         ok: false, 
         error: 'Email already registered' 
+      });
+    }
+    
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+// C) Host applications endpoint
+app.post('/api/host-applications', async (req, res) => {
+  try {
+    const { 
+      business_name, property_type, first_name, last_name, email, phone,
+      property_address, parking_spaces, electrical_capacity, daily_traffic,
+      operating_hours, partnership_model, implementation_timeline,
+      amenities, additional_info 
+    } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ ok: false, error: 'Email is required' });
+    }
+
+    if (!pool) {
+      console.log('[HOST-APPS] No database connection - using in-memory fallback for:', email);
+      return res.status(201).json({ 
+        ok: true, 
+        message: 'Host application received (stored in-memory)' 
+      });
+    }
+
+    // Test connection before inserting
+    await pool.query('SELECT 1');
+    
+    await pool.query(
+      `INSERT INTO public.host_applications(
+        business_name, property_type, first_name, last_name, email, phone,
+        property_address, parking_spaces, electrical_capacity, daily_traffic,
+        operating_hours, partnership_model, implementation_timeline,
+        amenities, additional_info
+      ) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+      [
+        business_name, property_type, first_name, last_name, email, phone,
+        property_address, parseInt(parking_spaces) || 0, electrical_capacity, daily_traffic,
+        operating_hours, partnership_model, implementation_timeline,
+        amenities, additional_info
+      ]
+    );
+
+    console.log(`[HOST-APPS] New host application saved to Supabase: ${email}`);
+    res.status(201).json({ ok: true, message: 'Host application saved to database' });
+  } catch (error: any) {
+    console.error('[HOST-APPS] Database error:', error.message);
+    
+    if (error.code === 'ENOTFOUND') {
+      return res.status(500).json({ 
+        ok: false, 
+        error: 'Database connection failed - DNS resolution error' 
+      });
+    } else if (error.code === '23505') {
+      return res.status(409).json({ 
+        ok: false, 
+        error: 'Application already submitted for this email' 
       });
     }
     

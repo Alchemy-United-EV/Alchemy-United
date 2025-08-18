@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Router, Route, Switch } from "wouter";
 import Home from "@/pages/home/Home";
 import EarlyAccess from "@/pages/early-access";
+import HostApplication from "@/pages/HostApplication";
 import "./index.css";
 import './integrations/forms';
 
@@ -750,7 +751,7 @@ function App() {
   }
   
   if (path === '/host-application') {
-    return <HostApplicationForm />;
+    return <HostApplication />;
   }
   
   if (path === '/thank-you') {
