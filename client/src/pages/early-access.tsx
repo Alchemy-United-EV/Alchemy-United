@@ -1,13 +1,11 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Link } from "react-router-dom";
+import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
 
 export default function EarlyAccess() {
-  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -18,7 +16,7 @@ export default function EarlyAccess() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log('Form submitted:', formData);
-    navigate('/thank-you?type=early-access');
+    window.location.href = '/thank-you?type=early-access';
   };
 
   return (
