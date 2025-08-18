@@ -4,6 +4,7 @@ import { Router, Route, Switch } from "wouter";
 import Home from "@/pages/home/Home";
 import EarlyAccess from "@/pages/early-access";
 import HostApplication from "@/pages/HostApplication";
+import Client from "@/pages/Client";
 import "./index.css";
 import './integrations/forms';
 
@@ -348,6 +349,7 @@ function HomeComponent() {
           <Route path="/" component={Home} />
           <Route path="/early-access" component={EarlyAccess} />
           <Route path="/host-application" component={HostApplicationForm} />
+          <Route path="/client" component={Client} />
           <Route>
             <div>Page not found</div>
           </Route>

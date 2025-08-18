@@ -9,6 +9,7 @@ Premium web platform for Alchemy United luxury EV charging network, featuring co
 - **Premium UI/UX**: Dopamine-driven design with gold gradients and luxury aesthetics
 - **Mobile-First**: Responsive design optimized for all devices
 - **Form Processing**: Advanced validation with email integration
+- **Client Dashboard**: Read-only dashboard for viewing form submissions
 - **Performance**: Optimized 22.2KB production bundle
 - **Analytics**: Google Tag Manager integration
 - **Deployment**: Autoscale-ready configuration
@@ -55,8 +56,22 @@ Create `.env` file with your secrets:
 ```env
 DATABASE_URL=your_database_url
 SENDGRID_API_KEY=your_sendgrid_key
-SESSION_SECRET=your_session_secret
+CLIENT_PASSWORD=your_secure_client_dashboard_password
+VITE_API_BASE_URL=https://your-render-app.onrender.com (for Vercel)
 ```
+
+## 📊 Client Dashboard
+Access the read-only client dashboard at `/client` to view form submissions:
+- **URL**: https://your-domain.com/client
+- **Features**: Search, pagination, CSV export
+- **Data**: Signups and host applications
+- **Security**: Password-protected access
+
+### Dashboard Usage:
+1. Navigate to `/client`
+2. Enter the CLIENT_PASSWORD
+3. View and export form data
+4. No editing or deletion allowed (read-only)
 
 ## 📱 Mobile Upload Ready
 This project includes complete GitHub upload instructions for iPhone Safari Desktop mode. See `IPHONE-GITHUB-UPLOAD-GUIDE.md` for step-by-step instructions.
