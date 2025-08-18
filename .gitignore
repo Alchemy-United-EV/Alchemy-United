@@ -57,3 +57,9 @@ vite.config.ts.*
 # Replit specific
 .replit_modules/
 .config/
+# Block archives
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
