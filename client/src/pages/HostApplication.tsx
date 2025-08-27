@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { supabase } from '../supabaseClient';
 
 export default function HostApplication() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -15,20 +14,14 @@ export default function HostApplication() {
       const form = new FormData(e.currentTarget);
       const payload = Object.fromEntries(form.entries()); // keys must match column names
 
-      // Try Supabase first, fallback to API route if needed
-      if (supabase) {
-        const { error } = await supabase.from("host_applications").insert([payload]);
-        if (error) throw error;
-      } else {
-        // Fallback to API route if Supabase client not configured
-        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/host-applications`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        await res.json();
-      }
+      // Submit to API route
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/host-applications`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await res.json();
 
       setMessage('Host application submitted successfully! We will contact you soon.');
       setMessageType('success');
