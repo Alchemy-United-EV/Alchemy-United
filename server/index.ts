@@ -15,8 +15,8 @@ console.log('[DEPLOYMENT] Starting server with Airtable storage...');
 const AIR = {
   token: process.env.AIRTABLE_TOKEN!,
   base: process.env.AIRTABLE_BASE_ID!,
-  signups: process.env.AIRTABLE_SIGNUPS_TABLE || "signups",
-  hosts: process.env.AIRTABLE_HOSTS_TABLE || "host_applications",
+  signups: process.env.AIRTABLE_SIGNUPS_TABLE || "Signups",
+  hosts: process.env.AIRTABLE_HOSTS_TABLE || "Host Applications",
 };
 
 async function airWrite(table: string, fields: any) {
@@ -57,8 +57,22 @@ app.post('/api/signups', async (req, res) => {
     const { first_name, last_name, email, phone } = req.body || {};
     if (!email) return res.status(400).json({ ok: false, error: "Email required" });
     
-    const r = await airWrite(AIR.signups, { first_name, last_name, email, phone });
-    if (!r.ok) return res.status(r.status).json({ ok: false, error: await r.text() });
+    // Map to Airtable field names (with spaces and title case)
+    const airtableFields = {
+      "First Name": first_name,
+      "Last Name": last_name,
+      "Email": email,
+      "Phone": phone
+    };
+    
+    console.log(`[SIGNUPS] Sending to Airtable table "${AIR.signups}" with fields:`, airtableFields);
+    
+    const r = await airWrite(AIR.signups, airtableFields);
+    if (!r.ok) {
+      const errorText = await r.text();
+      console.error(`[SIGNUPS] Airtable error:`, errorText);
+      return res.status(r.status).json({ ok: false, error: errorText });
+    }
     
     console.log(`[SIGNUPS] New signup saved to Airtable: ${email}`);
     res.status(201).json({ ok: true });
@@ -74,7 +88,31 @@ app.post('/api/host-applications', async (req, res) => {
     const fields = req.body || {};
     if (!fields?.email) return res.status(400).json({ ok: false, error: "Email required" });
     
-    const r = await airWrite(AIR.hosts, fields);
+    // Map common fields to Airtable field names (adjust based on your actual Host Applications table structure)
+    const airtableFields = {
+      "Business Name": fields.business_name,
+      "Property Type": fields.property_type,
+      "First Name": fields.first_name,
+      "Last Name": fields.last_name,
+      "Email": fields.email,
+      "Phone": fields.phone,
+      "Property Address": fields.property_address,
+      "Parking Spaces": fields.parking_spaces,
+      "Electrical Capacity": fields.electrical_capacity,
+      "Daily Traffic": fields.daily_traffic,
+      "Operating Hours": fields.operating_hours,
+      "Partnership Model": fields.partnership_model,
+      "Implementation Timeline": fields.implementation_timeline,
+      "Amenities": fields.amenities,
+      "Additional Info": fields.additional_info
+    };
+    
+    // Filter out undefined values
+    const cleanFields = Object.fromEntries(
+      Object.entries(airtableFields).filter(([_, value]) => value !== undefined)
+    );
+    
+    const r = await airWrite(AIR.hosts, cleanFields);
     if (!r.ok) return res.status(r.status).json({ ok: false, error: await r.text() });
     
     console.log(`[HOST-APPS] New host application saved to Airtable: ${fields.email}`);
