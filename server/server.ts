@@ -2,7 +2,6 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import cors from 'cors';
 import { db } from './sqlite.js';
-import { sendEmail } from './email.js';
 
 const app = express();
 app.use(express.json());
@@ -18,7 +17,7 @@ app.post('/api/lead', async (req, res) => {
     `INSERT INTO leads (first_name,last_name,email,phone,created_at) VALUES (?,?,?,?,datetime('now'))`
   );
   stmt.run(firstName, lastName, email, phone);
-  await sendEmail('New Early Access lead', JSON.stringify(req.body, null, 2));
+  // Email functionality removed - data saved to Airtable only
   res.json({ ok: true });
 });
 
@@ -29,7 +28,7 @@ app.post('/api/host-application', async (req, res) => {
     `INSERT INTO hosts (data_json,created_at) VALUES (?,datetime('now'))`
   );
   stmt.run(JSON.stringify(d));
-  await sendEmail('New Host Application', JSON.stringify(d, null, 2));
+  // Email functionality removed - data saved to Airtable only
   res.json({ ok: true });
 });
 
