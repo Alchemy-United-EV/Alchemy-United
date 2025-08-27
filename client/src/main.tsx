@@ -5,6 +5,7 @@ import Home from "@/pages/home/Home";
 import EarlyAccess from "@/pages/early-access";
 import HostApplication from "@/pages/HostApplication";
 import Client from "@/pages/Client";
+import { ToastProvider } from "@/components/ui/toast";
 import "./index.css";
 import './integrations/forms';
 
@@ -393,7 +394,9 @@ if (!el) throw new Error("No #root element");
 
 createRoot(el).render(
   <React.StrictMode>
-    <App />
+    <ToastProvider>
+      <App />
+    </ToastProvider>
   </React.StrictMode>
 );
 
