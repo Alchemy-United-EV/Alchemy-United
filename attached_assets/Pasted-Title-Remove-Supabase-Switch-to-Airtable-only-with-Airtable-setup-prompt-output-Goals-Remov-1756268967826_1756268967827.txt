@@ -1,0 +1,169 @@
+Title: Remove Supabase + Switch to Airtable-only (with Airtable setup prompt output)
+
+Goals:
+- Remove all Supabase usage (code, deps, env).
+- Make /api/signups and /api/host-applications write to Airtable only.
+- Update /api/health to report { database: "airtable" }.
+- Clean secrets/env: delete Supabase keys everywhere; add Airtable keys placeholders.
+- Print an “Airtable Setup Prompt” I can paste in Airtable to create tables/fields that match my two forms.
+
+Repo assumptions:
+- Backend entry: server/index.ts (Node 18+, global fetch available).
+- Frontend forms already POST to /api/signups and /api/host-applications.
+
+Actions:
+
+1) Dependencies
+- Remove Supabase/Postgres deps:
+  - npm remove pg @types/pg @supabase/supabase-js
+- If import errors reference ‘pg’ or supabase, delete those code paths.
+
+2) Code changes (server/index.ts)
+- Ensure the file exports only Airtable writes for both routes.
+- Insert near the top (adjust imports only if needed):
+  const AIR = {
+    token: process.env.AIRTABLE_TOKEN!,
+    base: process.env.AIRTABLE_BASE_ID!,
+    signups: process.env.AIRTABLE_SIGNUPS_TABLE || "signups",
+    hosts: process.env.AIRTABLE_HOSTS_TABLE || "host_applications",
+  };
+
+  async function airWrite(table, fields) {
+    const url = `https://api.airtable.com/v0/${AIR.base}/${encodeURIComponent(table)}`;
+    const r = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${AIR.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ records: [{ fields }] }),
+    });
+    return r;
+  }
+
+- Replace /api/health to only report Airtable:
+  app.get("/api/health", (_req, res) => {
+    res.status(200).json({
+      ok: true,
+      env: process.env.NODE_ENV || "development",
+      database: "airtable",
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+- Replace POST /api/signups:
+  app.post("/api/signups", async (req, res) => {
+    try {
+      const { first_name, last_name, email, phone } = req.body || {};
+      if (!email) return res.status(400).json({ ok:false, error:"Email required" });
+      const r = await airWrite(AIR.signups, { first_name, last_name, email, phone });
+      if (!r.ok) return res.status(r.status).json({ ok:false, error: await r.text() });
+      res.status(201).json({ ok:true });
+    } catch (e) {
+      console.error("[signups]", e);
+      res.status(500).json({ ok:false, error:"Server error" });
+    }
+  });
+
+- Replace POST /api/host-applications:
+  app.post("/api/host-applications", async (req, res) => {
+    try {
+      const fields = req.body || {};
+      if (!fields?.email) return res.status(400).json({ ok:false, error:"Email required" });
+      const r = await airWrite(AIR.hosts, fields);
+      if (!r.ok) return res.status(r.status).json({ ok:false, error: await r.text() });
+      res.status(201).json({ ok:true });
+    } catch (e) {
+      console.error("[host-applications]", e);
+      res.status(500).json({ ok:false, error:"Server error" });
+    }
+  });
+
+- Remove any remaining Supabase/pg imports/usages/files.
+
+3) Env & secrets cleanup
+- Delete from ALL environments (Replit, Render, Vercel, local .env*):
+  DATABASE_URL, SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, any SUPABASE_*
+- Add backend env placeholders where backend runs (Render/Replit):
+  AIRTABLE_TOKEN=pat_xxxxxxxxxxxxx              # scope: data.records:write
+  AIRTABLE_BASE_ID=appXXXXXXXXXXXX
+  AIRTABLE_SIGNUPS_TABLE=signups
+  AIRTABLE_HOSTS_TABLE=host_applications
+- Frontend: keep ONLY VITE_API_BASE_URL (pointing to backend URL). Remove VITE_SUPABASE_*.
+
+- Update .env.example to include ONLY:
+  AIRTABLE_TOKEN=
+  AIRTABLE_BASE_ID=
+  AIRTABLE_SIGNUPS_TABLE=signups
+  AIRTABLE_HOSTS_TABLE=host_applications
+  VITE_API_BASE_URL=
+
+4) .gitignore
+- Ensure .env, .env.*, dist, .vercel are ignored.
+
+5) Build/Run
+- Confirm scripts unchanged:
+  "dev": "NODE_ENV=development tsx server/index.ts"
+  "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist"
+  "start": "NODE_ENV=production node dist/index.js"
+
+6) Output tests (print commands to the agent output)
+- Print ready-to-run curl:
+  curl "$API_BASE/api/health"
+  curl -X POST "$API_BASE/api/signups" -H "Content-Type: application/json" \
+    -d '{"first_name":"Jay","last_name":"B","email":"jay@example.com","phone":"832-555-0000"}'
+  curl -X POST "$API_BASE/api/host-applications" -H "Content-Type: application/json" \
+    -d '{"business_name":"Test Site","property_type":"Retail","first_name":"Jay","last_name":"B","email":"jay@example.com"}'
+
+7) PRINT THIS “Airtable Setup Prompt” block verbatim at the end (for me to copy into Airtable’s assistant or use as a checklist):
+
+---
+Airtable Setup Prompt (copy into Airtable)
+
+Create a base named **Alchemy United** with two tables that match my website forms:
+
+Table 1: signups
+- first_name (Single line text)
+- last_name  (Single line text)
+- email      (Email) [required, unique preferred]
+- phone      (Phone number)
+- created_at (Created time)
+
+Table 2: host_applications
+- business_name          (Single line text) [required]
+- property_type          (Single select: Retail, Office, Hotel, Parking Garage, Mixed-use, Other)
+- first_name             (Single line text) [required]
+- last_name              (Single line text) [required]
+- email                  (Email) [required]
+- phone                  (Phone number)
+- property_address       (Long text)
+- parking_spaces         (Number, integer)
+- electrical_capacity    (Single select: 120V, 208V, 240V, 480V, Other)
+- daily_traffic          (Single select: Low, Medium, High)
+- operating_hours        (Single select: Business hours, Extended, 24/7)
+- partnership_model      (Single select: Revenue Share, Lease, Hybrid, Undecided)
+- implementation_timeline(Single select: ASAP, 1–3 months, 3–6 months, >6 months)
+- amenities              (Long text)  // WiFi, restrooms, food service, etc.
+- additional_info        (Long text)
+- created_at             (Created time)
+
+API notes:
+- Base ID: provide me the Base ID (like appXXXXXXXX) from Airtable.
+- Personal Access Token: scope “data.records:write”.
+- I’ll POST records to endpoints:
+  https://api.airtable.com/v0/{BaseID}/signups
+  https://api.airtable.com/v0/{BaseID}/host_applications
+- Field names must match exactly the column names above.
+---
+
+8) Commit (if repo is git-enabled)
+- git add -A
+- git commit -m "chore: remove Supabase; Airtable-only storage with setup prompt"
+- git push origin main
+
+Deliverables:
+- Summary of removed deps/files
+- List of env vars added/removed
+- Diff summary for server/index.ts
+- The Airtable Setup Prompt block
+- The test curl commands

@@ -1,0 +1,58 @@
+Create a read-only Client Dashboard so my client can view form submissions.
+
+Assumptions:
+- Backend: Node/Express in server/index.ts with Postgres (Supabase) via DATABASE_URL.
+- Frontend: Vite/React + Tailwind.
+- Existing tables: public.signups, public.host_applications.
+
+Goal:
+- Public route: /client (separate from /admin).
+- Simple password gate (CLIENT_PASSWORD env on backend).
+- Read-only tables with search + pagination + CSV export.
+
+ENV:
+- Add CLIENT_PASSWORD to .env.example.
+- Backend reads process.env.CLIENT_PASSWORD. If missing, block access.
+
+SERVER (server/index.ts + new file server/mw/clientAuth.ts):
+1) Create middleware clientAuth that checks header `x-client-key` equals process.env.CLIENT_PASSWORD. On mismatch → 401.
+2) Add routes (protected by clientAuth):
+   - GET /api/client/signups?search=&limit=50&offset=0
+     • Search ILIKE across first_name,last_name,email,phone. Return {rows,total}.
+   - GET /api/client/host-applications?search=&limit=50&offset=0
+     • Search ILIKE across business_name,email,phone,property_address. Return {rows,total}.
+   - GET /api/client/export/signups.csv
+   - GET /api/client/export/host-applications.csv
+     • Use parameterized queries; set CSV headers.
+
+CLIENT (client/src/pages/Client.tsx + route):
+1) Page /client:
+   - If no stored key in localStorage('client_key'): show password form (input + “Remember me”).
+   - On submit, save key and attempt a test fetch; on 401, show error.
+2) UI:
+   - Tabs: “Signups”, “Host Applications”.
+   - Each tab: search input, table (sticky header), pagination (Prev/Next), “Export CSV” button.
+   - Columns:
+     • Signups: created_at, first_name, last_name, email, phone.
+     • Host Applications: created_at, business_name, email, phone, property_address, view “Details” (modal shows full row).
+3) Networking:
+   - All fetches include header: { "x-client-key": localStorage.getItem("client_key") }.
+   - Base URL: `${import.meta.env.VITE_API_BASE_URL}`.
+4) Styling: Tailwind defaults (container mx-auto p-6, table-auto w-full, inputs border rounded p-2, buttons bg-slate-900 text-white rounded px-3 py-2 hover:opacity-90).
+
+ROUTING:
+- Add route `/client` to the app’s router to render Client.tsx.
+- Optional: add a hidden footer link to /client (className="hidden").
+
+DOCS:
+- Update README with:
+  • ENV required: CLIENT_PASSWORD (Render), VITE_API_BASE_URL (Vercel).
+  • Client URL: https://<your-domain>/client
+  • How to export CSV.
+  • Read-only note (no edits/deletes).
+
+OUTPUT:
+- Show diffs for: server/index.ts, server/mw/clientAuth.ts, client/src/pages/Client.tsx, router update, .env.example, README changes.
+- Print two curl tests:
+  curl -H "x-client-key: <pwd>" https://<render-app>/api/client/signups
+  curl -H "x-client-key: <pwd>" https://<render-app>/api/client/export/signups.csv

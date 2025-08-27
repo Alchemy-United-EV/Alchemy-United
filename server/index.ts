@@ -1,44 +1,35 @@
-// Supabase Postgres integration with fallback to in-memory storage
+// Airtable-only storage for Alchemy United forms
 
 import express, { type Request, type Response, type NextFunction } from "express";
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { Pool } from 'pg';
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { clientAuth } from "./mw/clientAuth";
 
 dotenv.config();
 
-console.log('[DEPLOYMENT] Starting server with Supabase Postgres...');
+console.log('[DEPLOYMENT] Starting server with Airtable storage...');
 
-// Create Postgres pool if DATABASE_URL is available
-let pool: Pool | null = null;
-if (process.env.DATABASE_URL) {
-  try {
-    pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false },
-      connectionTimeoutMillis: 10000,
-      idleTimeoutMillis: 30000,
-      max: 5
-    });
-    
-    // Test the connection
-    pool.query('SELECT 1')
-      .then(() => console.log('[DEPLOYMENT] Supabase Postgres connection verified'))
-      .catch((err) => {
-        console.error('[DEPLOYMENT] Supabase connection test failed:', err.message);
-        console.log('[DEPLOYMENT] Falling back to in-memory storage');
-        pool = null;
-      });
-      
-    console.log('[DEPLOYMENT] Supabase Postgres pool initialized');
-  } catch (error) {
-    console.error('[DEPLOYMENT] Failed to create Postgres pool:', error);
-    pool = null;
-  }
-} else {
-  console.log('[DEPLOYMENT] No DATABASE_URL found, using in-memory storage');
+// Airtable configuration
+const AIR = {
+  token: process.env.AIRTABLE_TOKEN!,
+  base: process.env.AIRTABLE_BASE_ID!,
+  signups: process.env.AIRTABLE_SIGNUPS_TABLE || "Signups",
+  hosts: process.env.AIRTABLE_HOSTS_TABLE || "Host Applications",
+};
+
+async function airWrite(table: string, fields: any) {
+  const url = `https://api.airtable.com/v0/${AIR.base}/${encodeURIComponent(table)}`;
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${AIR.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ records: [{ fields }] }),
+  });
+  return r;
 }
 
 const app = express();
@@ -50,123 +41,111 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// A) Health endpoint FIRST so Vite dev middleware can't intercept it
+// Health endpoint
 app.get('/api/health', (_req, res) => {
-  res.status(200).json({ 
-    ok: true, 
-    env: process.env.NODE_ENV || 'development',
-    database: !!pool ? 'postgres' : 'in-memory',
-    timestamp: new Date().toISOString()
+  res.status(200).json({
+    ok: true,
+    env: process.env.NODE_ENV || "development",
+    database: "airtable",
+    timestamp: new Date().toISOString(),
   });
 });
 
-// B) Supabase signups endpoint
+// Signups endpoint
 app.post('/api/signups', async (req, res) => {
   try {
-    const { first_name, last_name, email, phone } = req.body;
+    const { first_name, last_name, email, phone } = req.body || {};
+    if (!email) return res.status(400).json({ ok: false, error: "Email required" });
     
-    if (!email) {
-      return res.status(400).json({ ok: false, error: 'Email is required' });
-    }
-
-    if (!pool) {
-      console.log('[SIGNUPS] No database connection - using in-memory fallback for:', email);
-      // In production, you might want to queue these for later processing
-      return res.status(201).json({ 
-        ok: true, 
-        message: 'Signup received (stored in-memory)' 
-      });
-    }
-
-    // Test connection before inserting
-    await pool.query('SELECT 1');
+    // Map to Airtable field names (with spaces and title case)
+    const airtableFields = {
+      "First Name": first_name,
+      "Last Name": last_name,
+      "Email": email,
+      "Phone": phone
+    };
     
-    await pool.query(
-      'INSERT INTO public.signups(first_name, last_name, email, phone) VALUES($1, $2, $3, $4)',
-      [first_name, last_name, email, phone]
-    );
-
-    console.log(`[SIGNUPS] New signup saved to Supabase: ${email}`);
-    res.status(201).json({ ok: true, message: 'Signup saved to database' });
-  } catch (error: any) {
-    console.error('[SIGNUPS] Database error:', error.message);
+    console.log(`[SIGNUPS] Sending to Airtable table "${AIR.signups}" with fields:`, airtableFields);
     
-    // Provide more specific error information
-    if (error.code === 'ENOTFOUND') {
-      return res.status(500).json({ 
-        ok: false, 
-        error: 'Database connection failed - DNS resolution error' 
-      });
-    } else if (error.code === '23505') {
-      return res.status(409).json({ 
-        ok: false, 
-        error: 'Email already registered' 
-      });
+    const r = await airWrite(AIR.signups, airtableFields);
+    if (!r.ok) {
+      const errorText = await r.text();
+      console.error(`[SIGNUPS] Airtable error:`, errorText);
+      return res.status(r.status).json({ ok: false, error: errorText });
     }
     
-    res.status(500).json({ ok: false, error: 'Server error' });
+    console.log(`[SIGNUPS] New signup saved to Airtable: ${email}`);
+    res.status(201).json({ ok: true });
+  } catch (e) {
+    console.error("[signups]", e);
+    res.status(500).json({ ok: false, error: "Server error" });
   }
 });
 
-// C) Host applications endpoint
+// Host applications endpoint
 app.post('/api/host-applications', async (req, res) => {
   try {
-    const { 
-      business_name, property_type, first_name, last_name, email, phone,
-      property_address, parking_spaces, electrical_capacity, daily_traffic,
-      operating_hours, partnership_model, implementation_timeline,
-      amenities, additional_info 
-    } = req.body;
+    const fields = req.body || {};
+    if (!fields?.email) return res.status(400).json({ ok: false, error: "Email required" });
     
-    if (!email) {
-      return res.status(400).json({ ok: false, error: 'Email is required' });
-    }
-
-    if (!pool) {
-      console.log('[HOST-APPS] No database connection - using in-memory fallback for:', email);
-      return res.status(201).json({ 
-        ok: true, 
-        message: 'Host application received (stored in-memory)' 
-      });
-    }
-
-    // Test connection before inserting
-    await pool.query('SELECT 1');
+    // Map common fields to Airtable field names (adjust based on your actual Host Applications table structure)
+    const airtableFields = {
+      "Business Name": fields.business_name,
+      "Property Type": fields.property_type,
+      "First Name": fields.first_name,
+      "Last Name": fields.last_name,
+      "Email": fields.email,
+      "Phone": fields.phone,
+      "Property Address": fields.property_address,
+      "Parking Spaces": fields.parking_spaces,
+      "Electrical Capacity": fields.electrical_capacity,
+      "Daily Traffic": fields.daily_traffic,
+      "Operating Hours": fields.operating_hours,
+      "Partnership Model": fields.partnership_model,
+      "Implementation Timeline": fields.implementation_timeline,
+      "Amenities": fields.amenities,
+      "Additional Info": fields.additional_info
+    };
     
-    await pool.query(
-      `INSERT INTO public.host_applications(
-        business_name, property_type, first_name, last_name, email, phone,
-        property_address, parking_spaces, electrical_capacity, daily_traffic,
-        operating_hours, partnership_model, implementation_timeline,
-        amenities, additional_info
-      ) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
-      [
-        business_name, property_type, first_name, last_name, email, phone,
-        property_address, parseInt(parking_spaces) || 0, electrical_capacity, daily_traffic,
-        operating_hours, partnership_model, implementation_timeline,
-        amenities, additional_info
-      ]
+    // Filter out undefined values
+    const cleanFields = Object.fromEntries(
+      Object.entries(airtableFields).filter(([_, value]) => value !== undefined)
     );
-
-    console.log(`[HOST-APPS] New host application saved to Supabase: ${email}`);
-    res.status(201).json({ ok: true, message: 'Host application saved to database' });
-  } catch (error: any) {
-    console.error('[HOST-APPS] Database error:', error.message);
     
-    if (error.code === 'ENOTFOUND') {
-      return res.status(500).json({ 
-        ok: false, 
-        error: 'Database connection failed - DNS resolution error' 
-      });
-    } else if (error.code === '23505') {
-      return res.status(409).json({ 
-        ok: false, 
-        error: 'Application already submitted for this email' 
-      });
-    }
+    const r = await airWrite(AIR.hosts, cleanFields);
+    if (!r.ok) return res.status(r.status).json({ ok: false, error: await r.text() });
     
-    res.status(500).json({ ok: false, error: 'Server error' });
+    console.log(`[HOST-APPS] New host application saved to Airtable: ${fields.email}`);
+    res.status(201).json({ ok: true });
+  } catch (e) {
+    console.error("[host-applications]", e);
+    res.status(500).json({ ok: false, error: "Server error" });
   }
+});
+
+// Client Dashboard API Routes (Protected) - Note: These will need Airtable read API implementation
+app.get('/api/client/signups', clientAuth, async (req, res) => {
+  res.status(503).json({ 
+    error: 'Client dashboard requires Airtable read API implementation' 
+  });
+});
+
+app.get('/api/client/host-applications', clientAuth, async (req, res) => {
+  res.status(503).json({ 
+    error: 'Client dashboard requires Airtable read API implementation' 
+  });
+});
+
+app.get('/api/client/export/signups.csv', clientAuth, async (req, res) => {
+  res.status(503).json({ 
+    error: 'CSV export requires Airtable read API implementation' 
+  });
+});
+
+app.get('/api/client/export/host-applications.csv', clientAuth, async (req, res) => {
+  res.status(503).json({ 
+    error: 'CSV export requires Airtable read API implementation' 
+  });
 });
 
 app.use((req, res, next) => {

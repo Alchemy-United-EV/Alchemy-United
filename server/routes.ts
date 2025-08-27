@@ -2,7 +2,6 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 // Removed database validation schemas - using direct type checking for email-only storage
-import { sendEmail, getEarlyAccessConfirmationEmail, getHostApplicationConfirmationEmail } from './emailService';
 import { honeypotMiddleware, rateLimitMiddleware } from "./middleware/honeypot";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -28,15 +27,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = req.body; // Direct validation removed for email-only storage
       const application = await storage.createEarlyAccessApplication(validatedData);
       
-      // Send confirmation email
-      try {
-        const emailData = getEarlyAccessConfirmationEmail(validatedData.firstName, validatedData.email);
-        await sendEmail(emailData);
-        console.log(`Confirmation email sent to ${validatedData.email}`);
-      } catch (emailError) {
-        console.error('Failed to send confirmation email:', emailError);
-        // Don't fail the request if email fails
-      }
+      // Email functionality removed - forms save to Airtable only
       
       res.status(201).json(application);
     } catch (error) {
@@ -88,19 +79,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = req.body; // Direct validation removed for email-only storage
       const application = await storage.createHostApplication(validatedData);
       
-      // Send confirmation email
-      try {
-        const emailData = getHostApplicationConfirmationEmail(
-          validatedData.contactFirstName, 
-          validatedData.businessName, 
-          validatedData.email
-        );
-        await sendEmail(emailData);
-        console.log(`Host application confirmation email sent to ${validatedData.email}`);
-      } catch (emailError) {
-        console.error('Failed to send host confirmation email:', emailError);
-        // Don't fail the request if email fails
-      }
+      // Email functionality removed - forms save to Airtable only
       
       res.status(201).json(application);
     } catch (error) {

@@ -18,29 +18,15 @@ export default function EarlyAccess() {
     console.log('Form submitted:', formData);
     
     try {
-      // Submit to server with required fields
-      const submissionData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        phone: formData.phone,
-        vehicleType: "Model S", // Default values for required fields
-        chargingFrequency: "Weekly",
-        location: "Not specified"
-      };
-      
-      // Submit to Supabase via new signups endpoint  
-      const supabaseData = {
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        email: formData.email,
-        phone: formData.phone
-      };
-
-      const response = await fetch('/api/signups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(supabaseData),
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/signups`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          first_name: formData.firstName,
+          last_name:  formData.lastName,
+          email:      formData.email,
+          phone:      formData.phone || ""
+        }),
       });
       
       if (response.ok) {

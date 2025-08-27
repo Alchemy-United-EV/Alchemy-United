@@ -1,0 +1,93 @@
+Title: Full App Audit (ElectroFlow / Alchemy United)
+
+Mode:
+  apply_fixes: false   # set to true to auto-apply safe fixes (see Fixes section)
+
+Scope:
+  - Repo health (git, branches, uncommitted files)
+  - Build/run scripts (package.json)
+  - Backend (Express/Vite server/index.ts, /api routes, port)
+  - Frontend (Vite, form pages, env usage)
+  - Environment variables (.env, .env.example, Replit Secrets)
+  - Supabase (DATABASE_URL connectivity, tables, RLS policies)
+  - Email (SENDGRID_API_KEY presence, graceful no-op if missing)
+  - Render + Vercel deployment linkage
+  - DNS status hints (Vercel domain validation)
+  - Basic security & DX checks
+
+Tasks:
+1) Repo & Scripts
+   - Print `git status`, current branch, remotes.
+   - Open package.json; list "scripts" and highlight dev/build/start/check.
+   - Confirm backend entry file path used by scripts (server/index.ts -> dist/index.js).
+
+2) Runtime Health
+   - Start dev if not running: `npm run dev` (or reuse running).
+   - Hit /api/health locally (or Preview URL) and print JSON.
+   - Verify health payload includes { ok, env, database } fields.
+
+3) Env Vars Audit
+   - List required keys and where they are set:
+     BACKEND: DATABASE_URL, SENDGRID_API_KEY
+     FRONTEND: VITE_API_BASE_URL, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+   - Cross-check presence in Replit Secrets and .env.example; diff any missing.
+
+4) Supabase Audit
+   - If DATABASE_URL present: attempt a short pg connection using node-postgres.
+   - Report: reachable? ssl? IPv4/Pooler? latency?
+   - Check/print existence of tables:
+       - signups (id, first_name, last_name, email, phone, created_at)
+       - host_applications (columns per schema)
+   - Verify RLS is enabled; report if insert policy exists for anon (insert-only, no select).
+
+5) API Routes Audit
+   - Locate /api/signups and (if present) /api/host-applications handlers.
+   - Confirm validation (email required), error handling, and 201/200 status codes.
+   - Print cURL examples that will work against Render URL.
+
+6) Frontend Audit
+   - Find Early Access and Host Application forms.
+   - Ensure each input has `name` matching DB columns.
+   - Check form submit handler uses `e.preventDefault()` + FormData + success reset.
+   - Confirm it targets Supabase client OR `VITE_API_BASE_URL`.
+
+7) Deployments
+   - Print current Render service URL (env var or README).
+   - Verify `start` script matches production server command.
+   - Suggest health checks for Render if missing.
+   - Print Vercel project URL and check that `VITE_API_BASE_URL` points to Render.
+
+8) DNS / Domain (informational)
+   - If Vercel shows Invalid Configuration, print the two required records:
+     A @ 76.76.21.21  and  CNAME www -> cname.vercel-dns.com
+   - If using Vercel DNS, note nameservers in use.
+
+9) Security & DX
+   - Ensure service_role keys are NOT in frontend.
+   - Check .gitignore (.env, dist, .vercel) present.
+   - Run `npm audit --production` and summarize highs/criticals.
+
+Outputs:
+- A single MARKDOWN report with sections 1–9.
+- For each failure, include a “Fix” line with the exact edit/command/env change.
+- Include ready-to-run cURL tests:
+    curl "$API_BASE/api/health"
+    curl -X POST "$API_BASE/api/signups" -H "Content-Type: application/json" -d '{"first_name":"Jay","last_name":"B","email":"jay@example.com","phone":"832-555-0000"}'
+    curl -X POST "$API_BASE/api/host-applications" -H "Content-Type: application/json" -d '{...minimal valid payload...}'
+
+Fixes (only if apply_fixes=true):
+- Create/update `.env.example` with placeholders for all required vars.
+- Add `.gitignore` entries for `.env`, `/dist`, `.vercel`.
+- Add defensive checks in server/index.ts:
+    - If SENDGRID_API_KEY missing, log warning and no-op email sending.
+    - Improved error JSON with status codes.
+- Create missing insert-only RLS policy SQL snippets for the two tables and print them (do not execute DB migrations).
+- Add minimal `/api/host-applications` route if missing (insert mapped fields).
+
+Assumptions:
+- Backend: Node/Express + Vite; entry at server/index.ts.
+- Render hosts backend; Vercel hosts frontend.
+- Supabase is Postgres (pooler URL recommended).
+- No destructive actions unless apply_fixes=true.
+
+Please begin the audit now and return the MARKDOWN report with a short “Top 5 Actions” summary at the top.
