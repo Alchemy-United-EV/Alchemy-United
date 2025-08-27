@@ -102,18 +102,15 @@ function EarlyAccessForm() {
     }
     
     try {
-      // Map to match server schema - need ALL required fields
+      // Map to match /api/signups endpoint format
       const submissionData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
+        first_name: formData.firstName,
+        last_name: formData.lastName,
         email: formData.email,
-        phone: formData.phone,
-        vehicleType: "Model S", // Default values for required fields
-        chargingFrequency: "Weekly",
-        location: "Not specified"
+        phone: formData.phone
       };
       
-      const response = await fetch('/api/early-access-applications', {
+      const response = await fetch('/api/signups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(submissionData),
