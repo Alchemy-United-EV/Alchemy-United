@@ -16,19 +16,9 @@ interface EmailParams {
 }
 
 export async function sendEmail(params: EmailParams): Promise<boolean> {
-  try {
-    await mailService.send({
-      to: params.to,
-      from: params.from,
-      subject: params.subject,
-      text: params.text,
-      html: params.html,
-    });
-    return true;
-  } catch (error) {
-    console.error('SendGrid email error:', error);
-    return false;
-  }
+  // Email sending temporarily disabled - forms still save to Airtable
+  console.log(`[EMAIL DISABLED] Would send email to: ${params.to} | Subject: ${params.subject}`);
+  return true; // Return true so forms continue to work normally
 }
 
 // Email templates
